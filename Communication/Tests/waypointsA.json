@@ -1,0 +1,454 @@
+{
+  "robot_commands": [
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-1",
+      "xyz_rpy": {
+        "x": -569.613,
+        "y": 298.711,
+        "z": 425.788,
+        "rx": -180.000,
+        "ry": 0.000,
+        "rz": -45.000
+      }
+    },
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-2",
+      "xyz_rpy": {
+        "x": -569.613,
+        "y": 298.711,
+        "z": 256.500,
+        "rx": -180.000,
+        "ry": 0.000,
+        "rz": -45.000
+      }
+    },
+    {
+      "type": "sleep",
+      "controller": "A",
+      "duration_ms": 2000
+    },
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-3",
+      "xyz_rpy": {
+        "x": -569.613,
+        "y": 298.711,
+        "z": 482.932,
+        "rx": -180.000,
+        "ry": 0.000,
+        "rz": -45.000
+      }
+    },
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-4",
+      "xyz_rpy": {
+        "x": -265.363,
+        "y": 512.133,
+        "z": 404.273,
+        "rx": 180.000,
+        "ry": 0.000,
+        "rz": -0.000
+      }
+    },
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-5",
+      "xyz_rpy": {
+        "x": -265.363,
+        "y": 512.133,
+        "z": 316.426,
+        "rx": 180.000,
+        "ry": 0.000,
+        "rz": -0.000
+      }
+    },
+    {
+      "type": "sleep",
+      "controller": "A",
+      "duration_ms": 2000
+    },
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-6",
+      "xyz_rpy": {
+        "x": -265.363,
+        "y": 512.133,
+        "z": 215.426,
+        "rx": 180.000,
+        "ry": 0.000,
+        "rz": -0.000
+      }
+    },
+    {
+      "type": "sleep",
+      "controller": "A",
+      "duration_ms": 2000
+    },
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-7",
+      "xyz_rpy": {
+        "x": -265.363,
+        "y": 512.133,
+        "z": 404.273,
+        "rx": 180.000,
+        "ry": 0.000,
+        "rz": -0.000
+      }
+    },
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-8",
+      "xyz_rpy": {
+        "x": -265.363,
+        "y": 376.462,
+        "z": 404.273,
+        "rx": 180.000,
+        "ry": 0.000,
+        "rz": -0.000
+      }
+    },
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-9",
+      "xyz_rpy": {
+        "x": 99.898,
+        "y": 376.462,
+        "z": 227.718,
+        "rx": 180.000,
+        "ry": 0.000,
+        "rz": -0.000
+      }
+    },
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-10",
+      "xyz_rpy": {
+        "x": 77.387,
+        "y": 451.135,
+        "z": 162.426,
+        "rx": 180.000,
+        "ry": -0.000,
+        "rz": -0.000
+      }
+    },
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-11",
+      "xyz_rpy": {
+        "x": 77.387,
+        "y": 531.360,
+        "z": 162.426,
+        "rx": 180.000,
+        "ry": -0.000,
+        "rz": -0.000
+      }
+    },
+    {
+      "type": "sleep",
+      "controller": "A",
+      "duration_ms": 2000
+    },
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-12",
+      "xyz_rpy": {
+        "x": 77.387,
+        "y": 289.280,
+        "z": 440.523,
+        "rx": 180.000,
+        "ry": 0.000,
+        "rz": -0.000
+      }
+    },
+    {
+      "type": "sleep",
+      "controller": "A",
+      "duration_ms": 2000
+    },
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-13",
+      "xyz_rpy": {
+        "x": 77.387,
+        "y": 289.280,
+        "z": 440.523,
+        "rx": 180.000,
+        "ry": 0.000,
+        "rz": 0.000
+      }
+    },
+    {
+      "type": "sleep",
+      "controller": "A",
+      "duration_ms": 5000
+    },
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-14",
+      "xyz_rpy": {
+        "x": 77.387,
+        "y": 289.280,
+        "z": 440.523,
+        "rx": 180.000,
+        "ry": 0.000,
+        "rz": 0.000
+      }
+    },
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-92",
+      "xyz_rpy": {
+        "x": 77.386,
+        "y": -5.720,
+        "z": 440.523,
+        "rx": -180.000,
+        "ry": 0.000,
+        "rz": -180.000
+      }
+    },
+    {
+      "type": "sleep",
+      "controller": "A",
+      "duration_ms": 2000
+    },
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-15",
+      "xyz_rpy": {
+        "x": 77.389,
+        "y": 563.220,
+        "z": 322.105,
+        "rx": 180.000,
+        "ry": 0.000,
+        "rz": 0.000
+      }
+    },
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-16",
+      "xyz_rpy": {
+        "x": 144.067,
+        "y": 563.220,
+        "z": 322.105,
+        "rx": 180.000,
+        "ry": 0.000,
+        "rz": 0.000
+      }
+    },
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-17",
+      "xyz_rpy": {
+        "x": 145.347,
+        "y": 45.250,
+        "z": 440.523,
+        "rx": -180.000,
+        "ry": 0.000,
+        "rz": -180.000
+      }
+    },
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-18",
+      "xyz_rpy": {
+        "x": 77.387,
+        "y": 289.280,
+        "z": 440.523,
+        "rx": 180.000,
+        "ry": 0.000,
+        "rz": -0.000
+      }
+    },
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-19",
+      "xyz_rpy": {
+        "x": 77.387,
+        "y": 531.360,
+        "z": 131.426,
+        "rx": 180.000,
+        "ry": -0.000,
+        "rz": -0.000
+      }
+    },
+    {
+      "type": "sleep",
+      "controller": "A",
+      "duration_ms": 2000
+    },
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-20",
+      "xyz_rpy": {
+        "x": 77.387,
+        "y": 451.134,
+        "z": 131.426,
+        "rx": -180.000,
+        "ry": 0.000,
+        "rz": -0.000
+      }
+    },
+    {
+      "type": "sleep",
+      "controller": "A",
+      "duration_ms": 2000
+    },
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-21",
+      "xyz_rpy": {
+        "x": 77.387,
+        "y": 451.135,
+        "z": 162.426,
+        "rx": 180.000,
+        "ry": -0.000,
+        "rz": -0.000
+      }
+    },
+    {
+      "type": "sleep",
+      "controller": "A",
+      "duration_ms": 2000
+    },
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-22",
+      "xyz_rpy": {
+        "x": 99.898,
+        "y": 376.462,
+        "z": 227.718,
+        "rx": 180.000,
+        "ry": -0.000,
+        "rz": -0.000
+      }
+    },
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-23",
+      "xyz_rpy": {
+        "x": -265.363,
+        "y": 376.462,
+        "z": 404.273,
+        "rx": 180.000,
+        "ry": 0.000,
+        "rz": -0.000
+      }
+    },
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-24",
+      "xyz_rpy": {
+        "x": -265.363,
+        "y": 512.133,
+        "z": 404.273,
+        "rx": 180.000,
+        "ry": 0.000,
+        "rz": -0.000
+      }
+    },
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-25",
+      "xyz_rpy": {
+        "x": -265.363,
+        "y": 512.133,
+        "z": 215.426,
+        "rx": 180.000,
+        "ry": 0.000,
+        "rz": -0.000
+      }
+    },
+    {
+      "type": "sleep",
+      "controller": "A",
+      "duration_ms": 2000
+    },
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-26",
+      "xyz_rpy": {
+        "x": -265.363,
+        "y": 512.133,
+        "z": 316.426,
+        "rx": 180.000,
+        "ry": 0.000,
+        "rz": -0.000
+      }
+    },
+    {
+      "type": "sleep",
+      "controller": "A",
+      "duration_ms": 2000
+    },
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-27",
+      "xyz_rpy": {
+        "x": -265.363,
+        "y": 512.133,
+        "z": 404.273,
+        "rx": 180.000,
+        "ry": 0.000,
+        "rz": -0.000
+      }
+    },
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-28",
+      "xyz_rpy": {
+        "x": -569.613,
+        "y": 298.711,
+        "z": 482.932,
+        "rx": -180.000,
+        "ry": 0.000,
+        "rz": -45.000
+      }
+    },
+    {
+      "type": "move",
+      "controller": "A",
+      "location": "loc-29",
+      "xyz_rpy": {
+        "x": -569.613,
+        "y": 298.711,
+        "z": 256.500,
+        "rx": -180.000,
+        "ry": 0.000,
+        "rz": -45.000
+      }
+    }
+  ]
+}

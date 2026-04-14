@@ -1,0 +1,18 @@
+{
+  "python.defaultInterpreterPath": "C:/Users/27761/anaconda3/envs/test_env_2/python.exe",
+  "python.analysis.useLibraryCodeForTypes": true,
+  "python.analysis.extraPaths": [
+    "C:/Users/27761/anaconda3/envs/test_env_2/Lib/site-packages",
+    "C:/Users/27761/anaconda3/envs/test_env_2/Lib/site-packages/visp"
+  ],
+  "python.analysis.diagnosticSeverityOverrides": {
+    "reportMissingModuleSource": "none"
+  },
+  "python.analysis.packageIndexDepths": [
+    {
+      "name": "visp",
+      "depth": 2,
+      "includeAllSymbols": true
+    }
+  ]
+}

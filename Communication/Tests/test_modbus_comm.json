@@ -1,0 +1,67 @@
+{
+  "COIL1": {
+    "typeName": "Bool",
+    "field": "COIL1",
+    "baseType": "BOOL",
+    "area": "Coils",
+    "bytesPerElem": 1,
+    "startByteOffset": 0,
+    "dims": [],
+    "strides": [],
+    "count": 1,
+    "bitBase": 5,
+    "bitStride": 1
+  },
+  "INPUT1": {
+    "typeName": "Bool",
+    "field": "INPUT1",
+    "baseType": "BOOL",
+    "area": "InputStatus",
+    "bytesPerElem": 1,
+    "startByteOffset": 0,
+    "dims": [],
+    "strides": [],
+    "count": 1,
+    "bitBase": 6,
+    "bitStride": 1
+  },
+  "UINT1": {
+    "typeName": "Int",
+    "field": "UINT1",
+    "baseType": "INT",
+    "area": "HoldingRegisters",
+    "bytesPerElem": 2,
+    "startByteOffset": 0,
+    "dims": [],
+    "strides": [],
+    "count": 1,
+    "regBase": 10,
+    "regStride": 1
+  },
+  "REAL1": {
+    "typeName": "Real",
+    "field": "REAL1",
+    "baseType": "REAL",
+    "area": "HoldingRegisters",
+    "bytesPerElem": 4,
+    "startByteOffset": 0,
+    "dims": [],
+    "strides": [],
+    "count": 1,
+    "regBase": 20,
+    "regStride": 1
+  },
+  "DWORD1": {
+    "typeName": "DWord",
+    "field": "DWORD1",
+    "baseType": "DWORD",
+    "area": "HoldingRegisters",
+    "bytesPerElem": 4,
+    "startByteOffset": 0,
+    "dims": [],
+    "strides": [],
+    "count": 1,
+    "regBase": 30,
+    "regStride": 1
+  }
+}
