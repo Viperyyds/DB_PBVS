@@ -45,6 +45,8 @@ class RobotCore:
         # 确保定时器线程为守护线程，以免阻止进程退出
         self.timer.daemon = True
 
+        self._current_mode = None
+        
         # 连接状态标记
         self.connected = False
 
@@ -54,12 +56,12 @@ class RobotCore:
     def _load_address_book(self) -> Optional[dict]:
         """加载地址簿的工具方法"""
         # TODO 按需修改json文件路径，根目录为 SDKPython
-        try_paths = ['./Communication/modbus_address_book.compact_win.json']
+        try_paths = ['Communication/modbus_address_book.compact_win.json']
         for path in try_paths:
             try:
                 return AddressBook.load(path)
             except Exception as e:
-                print(f"加载地址簿失败（路径：{path}）：{e}")
+                print(f"加载地址簿失败(路径：{path}): {e}")
         return None
 
     def _initialize_connection(self) -> None:
@@ -111,7 +113,7 @@ class RobotCore:
                 await self.RobotEnable()
                 await self.RobotReset()
                 await self.SetControlMode(ControlMode.Calibration)
-                await self.RobotSetParameters(self.robot_parameter)
+                # await self.RobotSetParameters(self.robot_parameter)
                 print("初始化成功！")
             except Exception as e:
                 print(f"初始化机器人失败：{e}")
@@ -172,7 +174,8 @@ class RobotCore:
         try:
             # 控制模式需转换为整数发送
             await self._service.write_uint('Parameters.Movement_Mode', int(mode.value))
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.01)
+            self._current_mode = mode
             print(f"控制模式已设置为：{mode}")
         except Exception as e:
             print(f"设置控制模式失败：{e}")
@@ -206,7 +209,7 @@ class RobotCore:
                     
                     await self._service.write_real(key, value, i, j)
 
-                    await asyncio.sleep(0.05)  # 缩短间隔
+                    await asyncio.sleep(0.01)  # 缩短间隔
                     print(f"已写入{key} 关节{i}参数{j}：{value}")
 
                 except Exception as e:
@@ -632,6 +635,66 @@ class RobotCore:
         except Exception as e:
             print(f"MoveJ 执行失败：{e}")
             raise
+    
+    async def MoveS(self, joint_positions: List[float]) -> None:
+        """
+        平滑可打断关节空间运动(MoveS) - 优化版
+        """
+        if not self.connected:
+            raise RuntimeError("机器人未连接，无法执行 MoveS")
+        if len(joint_positions) != 6:
+            raise ValueError("关节位置列表必须包含6个元素(J1-J6)")
+        # 记录总开始时间
+        start_total = time.perf_counter()
+        
+        try:
+            target_mode = ControlMode.MoveSoft
+            if self._current_mode != target_mode:
+                t1 = time.perf_counter()
+                await self.SetControlMode(target_mode)
+                self._current_mode = target_mode  # 更新缓存
+                t2 = time.perf_counter()
+                print(f"[Timing] 模式切换实际耗时: {(t2 - t1)*1000:.2f} ms")
+            else:
+                print(f"[Timing] 模式已是 MoveSoft,跳过 SetControlMode")
+            # t1 = time.perf_counter()
+            # await self.SetControlMode(ControlMode.MoveSoft) 
+            # t2 = time.perf_counter()
+            # print(f"[Timing] SetControlMode耗时: {(t2 - t1)*1000:.2f} ms")
+
+            t3 = time.perf_counter()
+            for i in range(6):
+                key = 'Parameters.MoveS_Target_Position'
+                await self._service.write_real(key, joint_positions[i], i+1)
+            t4 = time.perf_counter()
+            print(f"[Timing] 6次写入位置耗时: {(t4 - t3)*1000:.2f} ms")
+            
+            t5 = time.perf_counter()
+            await self._service.write_bool('Instructions.MoveS_Execute', True)
+            await asyncio.sleep(0.01)
+            await self._service.write_bool('Instructions.MoveS_Execute', False)
+            t6 = time.perf_counter()
+            print(f"[Timing] 触发指令+Sleep耗时: {(t6 - t5)*1000:.2f} ms")
+
+            end_total = time.perf_counter()
+            print(f"[Timing] MoveS 总耗时: {(end_total - start_total)*1000:.2f} ms")
+            print("-" * 30)
+            
+
+        except Exception as e:
+            print(f"MoveS 执行失败：{e}")
+            raise
+
+    async def AbortMoveS(self) -> None:
+        """中止当前 MoveS 运动"""
+        try:
+            await self._service.write_bool('Instructions.MoveS_Abort', True)
+            await asyncio.sleep(0.1)
+            await self._service.write_bool('Instructions.MoveS_Abort', False)
+        except Exception as e:
+            print(f"AbortMoveS 失败：{e}")
+            raise
+
 
     # 关节空间运动
     async def MoveJWait(self, joint_positions: List[float]) -> None:

@@ -146,6 +146,7 @@ class ControlMode(Enum):
     MoveCircle = 6
     TcpJog = 7
     TcpInch = 8
+    MoveSoft = 12
 
 
 class JogMode(Enum):

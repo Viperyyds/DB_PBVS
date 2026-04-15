@@ -14,70 +14,61 @@ import time
 import matplotlib.pyplot as plt
 import asyncio
 
-class RealTimePlotter:
-    def __init__(self, num_figures, width, height, title):
-        """初始化实时绘图器"""
-        plt.ion()  # 开启交互模式
-        # matplotlib 的 figsize 单位是英寸，这里假设 DPI 为 100 进行简单换算
-        self.fig, self.axs = plt.subplots(num_figures, 1, figsize=(width / 100, height / 100))
+class PBVSExperimentLogger:
+    def __init__(self):
+        self.time_ms = []
+        self.feature_errors = []
+        self.joint_velocities_deg_s = []
+        self.joint_angles_deg = []
 
-        # 如果只有一个子图，将其转换为列表以便统一处理
-        if num_figures == 1:
-            self.axs = [self.axs]
+        self.feature_error_legends = [
+            "error_feat_tx", "error_feat_ty", "error_feat_tz",
+            "error_feat_theta_ux", "error_feat_theta_uy", "error_feat_theta_uz"
+        ]
+        self.joint_legends = ["q1", "q2", "q3", "q4", "q5", "q6"]
 
-        self.fig.canvas.manager.set_window_title(title)
-        self.fig.tight_layout(pad=3.0)
+    @staticmethod
+    def _to_float_list(values, size):
+        data = np.asarray(values, dtype=float).reshape(-1)
+        return [float(data[i]) for i in range(size)]
 
-        self.lines = {}
-        self.x_data = {}
-        self.y_data = {}
+    def append(self, time_ms, feature_error, joint_velocity_rad_s, joint_angle_rad):
+        self.time_ms.append(float(time_ms))
+        self.feature_errors.append(self._to_float_list(feature_error, 6))
+        self.joint_velocities_deg_s.append(self._to_float_list(np.rad2deg(joint_velocity_rad_s), 6))
+        self.joint_angles_deg.append(self._to_float_list(np.rad2deg(joint_angle_rad), 6))
 
-    def setTitle(self, fig_id, title):
-        """设置子图标题"""
-        self.axs[fig_id].set_title(title)
+    def plot(self):
+        if not self.time_ms:
+            print("No PBVS data was recorded. Skip offline plotting.")
+            return
 
-    def initGraph(self, fig_id, num_graphs):
-        """初始化子图中的曲线数量"""
-        self.lines[fig_id] = []
-        self.x_data[fig_id] = []
-        self.y_data[fig_id] = [[] for _ in range(num_graphs)]
+        time_s = np.asarray(self.time_ms, dtype=float) / 1000.0
+        feature_errors = np.asarray(self.feature_errors, dtype=float)
+        joint_velocities_deg_s = np.asarray(self.joint_velocities_deg_s, dtype=float)
+        joint_angles_deg = np.asarray(self.joint_angles_deg, dtype=float)
 
-        for _ in range(num_graphs):
-            line, = self.axs[fig_id].plot([], [], label="")
-            self.lines[fig_id].append(line)
+        fig, axs = plt.subplots(3, 1, figsize=(8, 9), sharex=True)
+        fig.canvas.manager.set_window_title("PBVS experiment curves")
 
-    def setLegend(self, fig_id, graph_id, legend):
-        """设置图例"""
-        self.lines[fig_id][graph_id].set_label(legend)
-        self.axs[fig_id].legend(loc='upper right', fontsize='small')
+        plot_groups = [
+            (axs[0], feature_errors, self.feature_error_legends, "Visual features error", "error"),
+            (axs[1], joint_velocities_deg_s, self.joint_legends, "Joint velocities", "deg/s"),
+            (axs[2], joint_angles_deg, self.joint_legends, "Joint angles", "deg"),
+        ]
 
-    def plot(self, fig_id, x, y_values):
-        """
-        实时追加数据并更新图像
-        :param fig_id: 子图编号
-        :param x: x轴数据(如时间 t_sim_ms)
-        :param y_values: y轴数据(Visp的 vpColVector 或 list)
-        """
-        self.x_data[fig_id].append(x)
+        for ax, data, legends, title, ylabel in plot_groups:
+            for i, legend in enumerate(legends):
+                ax.plot(time_s, data[:, i], label=legend)
+            ax.set_title(title)
+            ax.set_ylabel(ylabel)
+            ax.grid(True)
+            ax.legend(loc='upper right', fontsize='small')
 
-        # 获取当前子图中曲线的数量 (即 6)
-        num_graphs = len(self.lines[fig_id])
+        axs[-1].set_xlabel("time (s)")
+        fig.tight_layout(pad=3.0)
+        plt.show()
 
-        # 显式使用索引循环，避免 Visp 的底层迭代器抛出 RuntimeError
-        for i in range(num_graphs):
-            # 提取数据并强制转为原生 float，防止 matplotlib 处理 visp 数据类型时出错
-            val = float(y_values[i])
-
-            self.y_data[fig_id][i].append(val)
-            self.lines[fig_id][i].set_data(self.x_data[fig_id], self.y_data[fig_id][i])
-
-        # 重新计算坐标轴范围并更新
-        self.axs[fig_id].relim()
-        self.axs[fig_id].autoscale_view()
-
-        # 刷新画布
-        self.fig.canvas.draw()
-        self.fig.canvas.flush_events()
 
 async def dbrobot_pbvs_control(e_M_o_np, cdMo_np, image_queue, duban_robot_con, opt_adaptive_gain, opt_plot, opt_task_sequencing):
     '''
@@ -128,40 +119,15 @@ async def dbrobot_pbvs_control(e_M_o_np, cdMo_np, image_queue, duban_robot_con, 
     task.setServo(Servo.EYETOHAND_L_cVe_eJe)
     task.setInteractionMatrixType(Servo.CURRENT)
 
-    # 绘制特征误差以及相机速度曲线
-    if opt_plot:
-        # 初始化绘图器 (宽度 500, 高度 500)
-        plotter = RealTimePlotter(3, 800, 900, "Real time curves plotter")
-
-        plotter.setTitle(0, "Visual features error")
-        plotter.setTitle(1, "joint velocities")
-        plotter.setTitle(2, 'joint angle')
-
-        plotter.initGraph(0, 6)
-        plotter.initGraph(1, 6)
-        plotter.initGraph(2, 6)
-
-        legends_0 = ["error_feat_tx", "error_feat_ty", "error_feat_tz",
-                     "error_feat_theta_ux", "error_feat_theta_uy", "error_feat_theta_uz"]
-        for i, leg in enumerate(legends_0):
-            plotter.setLegend(0, i, leg)
-
-        legends_1 = ["q1", "q2", "q3", "q4", "q5", "q6"]
-        for i, leg in enumerate(legends_1):
-            plotter.setLegend(1, i, leg)
-
-        legends_2 = ["q1", "q2", "q3", "q4", "q5", "q6"]
-        for i, leg in enumerate(legends_2):
-            plotter.setLegend(2, i, leg)
-    else:
-        plotter = None
+    # Record all samples during control and draw once after the experiment.
+    experiment_logger = PBVSExperimentLogger() if opt_plot else None
 
     final_quit = False
     has_converged = False
     # send_velocities = True
     servo_started = False
 
-    dt_sim = 0.05  # 控制系统运行周期(这里需要与视觉更新位姿的时间相匹配)
+    dt_sim = 0.15  # 控制系统运行周期(这里需要与视觉更新位姿的时间相匹配)
     t_virtual = 0.0  # 运行总时间
     # 视觉伺服主循环
     first_time = True
@@ -190,7 +156,7 @@ async def dbrobot_pbvs_control(e_M_o_np, cdMo_np, image_queue, duban_robot_con, 
         if cMo_raw is None:
             print("Target Lost! Holding current position.")
             # 策略：向机器人发送当前的关节位置，使其原地不动
-            await duban_robot_con.MoveJ(q_current_rad.tolist())
+            await duban_robot_con.MoveS(q_current_rad.tolist())
 
             # 目标丢失时同样进行周期补偿，保持控制循环节拍一致
             elapsed_lost = time.perf_counter() - loop_start
@@ -276,15 +242,13 @@ async def dbrobot_pbvs_control(e_M_o_np, cdMo_np, image_queue, duban_robot_con, 
         # 向机器人发送关节角度指令
         q_next_rad = (q_current_rad + q_dot_rad_s * dt_sim).tolist()
         t3 = time.perf_counter()
-        await duban_robot_con.MoveJ(q_next_rad)
+        await duban_robot_con.MoveS(q_next_rad)
         t4 = time.perf_counter()
 
-        print(f"获取角度: {(t1-t0)*1000:.1f} | 视觉: {(t2-t1)*1000:.1f} | 计算: {(t3-t2)*1000:.1f} | MoveJ: {(t4-t3)*1000:.1f}")
-        # 绘制关节角速度以及特征误差变化曲线
-        if opt_plot and (int(t_virtual/dt_sim) % 10 == 0):
-            plotter.plot(0, float(t_sim_ms), task.getError())
-            plotter.plot(1, float(t_sim_ms), np.rad2deg(q_dot_rad_s))# 把rad转化为deg,方便观察
-            plotter.plot(2, float(t_sim_ms), np.rad2deg(q_current_rad))
+        print(f"获取角度: {(t1-t0)*1000:.1f} | 视觉: {(t2-t1)*1000:.1f} | 计算: {(t3-t2)*1000:.1f} | MoveS: {(t4-t3)*1000:.1f}")
+        # 记录关节角速度、关节角和特征误差，实验结束后统一绘图
+        if opt_plot:
+            experiment_logger.append(float(t_sim_ms), error_np, q_dot_rad_s, q_current_rad)
 
         # 计算当前的特征误差
         cd_t_c = cdMc.getTranslationVector()
@@ -312,6 +276,5 @@ async def dbrobot_pbvs_control(e_M_o_np, cdMo_np, image_queue, duban_robot_con, 
             pass
         
     if opt_plot:
-        print("Simulation finished. Close the plot window to exit.")
-        plt.ioff()  # 关闭交互模式 (Interactive mode off)
-        plt.show()  # 阻塞程序，保持窗口常亮，直到用户手动点击右上角关闭
+        print("Experiment finished. Drawing recorded PBVS curves.")
+        experiment_logger.plot()

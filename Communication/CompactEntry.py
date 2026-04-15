@@ -3,7 +3,7 @@
 """
 import json
 import re
-from dataclasses import dataclass, field as dc_field
+from dataclasses import dataclass, field as dc_field, fields
 from typing import Dict, Tuple, List, Optional
 
 
@@ -32,9 +32,11 @@ class AddressBook:
             data = json.load(f)
 
         entries: Dict[str, CompactEntry] = {}
+        valid_fields = {f.name for f in fields(CompactEntry)}
         for k, v in (data or {}).items():
             if isinstance(v, dict):
-                entries[k] = CompactEntry(**v)
+                filtered = {key: value for key, value in v.items() if key in valid_fields}
+                entries[k] = CompactEntry(**filtered)
         return entries
 
     @staticmethod

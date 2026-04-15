@@ -675,7 +675,34 @@
     "startByteOffset": 96,
     "dims": [],
     "strides": [],
-    "count": 1
+    "count": 1,
+    "note": "非BOOL不建议映射到位区"
+  },
+  "Instructions.MoveS_Execute": {
+    "typeName": "Instructions",
+    "field": "MoveS_Execute",
+    "baseType": "BOOL",
+    "area": "Coils",
+    "bytesPerElem": 1,
+    "startByteOffset": 98,
+    "dims": [],
+    "strides": [],
+    "count": 1,
+    "bitBase": 784,
+    "bitStride": 8
+  },
+  "Instructions.MoveS_Abort": {
+    "typeName": "Instructions",
+    "field": "MoveS_Abort",
+    "baseType": "BOOL",
+    "area": "Coils",
+    "bytesPerElem": 1,
+    "startByteOffset": 99,
+    "dims": [],
+    "strides": [],
+    "count": 1,
+    "bitBase": 792,
+    "bitStride": 8
   },
   "Parameters.DH_Parameters": {
     "typeName": "Parameters",
@@ -689,8 +716,8 @@
       4
     ],
     "strides": [
-      1,
-      6
+      4,
+      1
     ],
     "count": 24,
     "regBase": 0,
@@ -1238,6 +1265,74 @@
     "strides": [],
     "count": 1,
     "regBase": 300,
+    "regStride": 2
+  },
+  "Parameters.MoveS_Target_Position": {
+    "typeName": "Parameters",
+    "field": "MoveS_Target_Position",
+    "baseType": "REAL",
+    "area": "HoldingRegisters",
+    "bytesPerElem": 4,
+    "startByteOffset": 604,
+    "dims": [
+      6
+    ],
+    "strides": [
+      1
+    ],
+    "count": 6,
+    "regBase": 302,
+    "regStride": 2
+  },
+  "Parameters.MoveS_Refference_Velocity": {
+    "typeName": "Parameters",
+    "field": "MoveS_Refference_Velocity",
+    "baseType": "REAL",
+    "area": "HoldingRegisters",
+    "bytesPerElem": 4,
+    "startByteOffset": 628,
+    "dims": [
+      6
+    ],
+    "strides": [
+      1
+    ],
+    "count": 6,
+    "regBase": 314,
+    "regStride": 2
+  },
+  "Parameters.MoveS_Refference_Acceleration": {
+    "typeName": "Parameters",
+    "field": "MoveS_Refference_Acceleration",
+    "baseType": "REAL",
+    "area": "HoldingRegisters",
+    "bytesPerElem": 4,
+    "startByteOffset": 652,
+    "dims": [
+      6
+    ],
+    "strides": [
+      1
+    ],
+    "count": 6,
+    "regBase": 326,
+    "regStride": 2
+  },
+  "Parameters.MoveS_Refference_Deceleration": {
+    "typeName": "Parameters",
+    "field": "MoveS_Refference_Deceleration",
+    "baseType": "REAL",
+    "area": "HoldingRegisters",
+    "bytesPerElem": 4,
+    "startByteOffset": 676,
+    "dims": [
+      6
+    ],
+    "strides": [
+      1
+    ],
+    "count": 6,
+    "regBase": 338,
     "regStride": 2
   },
   "Status.Error_ID": {
