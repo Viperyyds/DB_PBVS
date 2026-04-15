@@ -124,10 +124,11 @@ async def dbrobot_pbvs_control(e_M_o_np, cdMo_np, image_queue, duban_robot_con, 
 
     final_quit = False
     has_converged = False
+    exit_reason = "unknown"
     # send_velocities = True
     servo_started = False
 
-    dt_sim = 0.15  # 控制系统运行周期(这里需要与视觉更新位姿的时间相匹配)
+    dt_sim = 0.2  # 控制系统运行周期(这里需要与视觉更新位姿的时间相匹配)
     t_virtual = 0.0  # 运行总时间
     # 视觉伺服主循环
     first_time = True
@@ -138,9 +139,8 @@ async def dbrobot_pbvs_control(e_M_o_np, cdMo_np, image_queue, duban_robot_con, 
             # 27 是 Esc 的 ASCII 码，b'q' 是字符 q
             if key == b'q' or key == b'\x1b':
                 print(" 检测到退出指令，正在停止机器人... ")
-                # 紧急安全停止：发送当前位置
-                q_stop = await duban_robot_con.getCurrentJointAngles()
-                await duban_robot_con.MoveJ(q_stop.tolist())
+                await duban_robot_con.RobotStop()
+                exit_reason = "user_stop"
                 break  # 跳出 while 循环
         # 记录循环开始的时间
         loop_start = time.perf_counter()
@@ -203,6 +203,24 @@ async def dbrobot_pbvs_control(e_M_o_np, cdMo_np, image_queue, duban_robot_con, 
         J1_np = np.array(task.getTaskJacobian())
         error_np = np.array(task.getError())
 
+        # 计算当前的特征误差；如果已经收敛，先软保持当前位置，不再下发新的 PBVS 目标
+        cd_t_c = cdMc.getTranslationVector()
+        cd_tu_c = cdMc.getThetaUVector()
+
+        error_tr = (cd_t_c.sumSquare() ** 0.5) * 1000.0
+        error_tu = Math.deg(cd_tu_c.sumSquare() ** 0.5)
+        print(f"平移误差：{error_tr} mm;角度误差{error_tu} deg")
+
+        if error_tr < convergence_threshold_t and error_tu < convergence_threshold_tu:
+            has_converged = True
+            exit_reason = "converged"
+            print("Servo task has converged; holding current joint position with MoveS")
+            q_hold_rad = await duban_robot_con.getCurrentJointAngles()
+            await duban_robot_con.MoveS(q_hold_rad.tolist())
+            if opt_plot:
+                experiment_logger.append(float(t_sim_ms), error_np, np.zeros(6), q_hold_rad)
+            break
+
         # 5. DLS 核心算法
         # 设定阻尼因子 (可以根据需要微调，一般在 0.01 到 0.1 之间)
         lambda_dls = 0.02
@@ -249,19 +267,6 @@ async def dbrobot_pbvs_control(e_M_o_np, cdMo_np, image_queue, duban_robot_con, 
         # 记录关节角速度、关节角和特征误差，实验结束后统一绘图
         if opt_plot:
             experiment_logger.append(float(t_sim_ms), error_np, q_dot_rad_s, q_current_rad)
-
-        # 计算当前的特征误差
-        cd_t_c = cdMc.getTranslationVector()
-        cd_tu_c = cdMc.getThetaUVector()
-
-        error_tr = (cd_t_c.sumSquare() ** 0.5) * 1000.0
-        error_tu = Math.deg(cd_tu_c.sumSquare() ** 0.5)
-        print(f"平移误差：{error_tr} mm;角度误差{error_tu} deg")
-        # 收敛判断
-        if (not has_converged and error_tr < convergence_threshold_t and
-                error_tu < convergence_threshold_tu):
-            has_converged = True
-            print("Servo task has converged")
         if first_time:
             first_time = False
         t_virtual += dt_sim  # 控制时间步进
@@ -274,7 +279,4 @@ async def dbrobot_pbvs_control(e_M_o_np, cdMo_np, image_queue, duban_robot_con, 
             # 如果处理时间超过了 dt_sim，直接进入下一轮，不睡眠
             print(f"Warning: Control loop is running behind schedule by {-sleep_time:.3f} seconds!")
             pass
-        
-    if opt_plot:
-        print("Experiment finished. Drawing recorded PBVS curves.")
-        experiment_logger.plot()
+    return exit_reason, experiment_logger

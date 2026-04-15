@@ -98,8 +98,8 @@ def plot_durations(durations: List[float], avg_duration: float, max_duration: fl
 async def main():
     # 请根据实际机器人 IP 修改
     robot = RobotCore('10.16.208.244')
-    # 运行 100 轮测试
-    await test_moves_n_rounds(robot, num_rounds=100)
+    # 运行 500 轮测试
+    await test_moves_n_rounds(robot, num_rounds=500)
 
 
 if __name__ == "__main__":

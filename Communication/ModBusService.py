@@ -75,6 +75,7 @@ class ModBusService:
 
         # 合并投递标志：避免同一时间投递多个轮询任务
         self._poll_work_pending = False
+        self._polling_enabled = True
 
         # 重连退避参数
         self._consecutive_failures = 0          # 连续失败次数
@@ -147,6 +148,14 @@ class ModBusService:
     async def dispose(self):
         """释放资源（本质是停止服务）"""
         await self.stop()
+
+    async def pause_polling(self):
+        """暂停后台状态轮询，保留队列和通信连接。"""
+        self._polling_enabled = False
+
+    async def resume_polling(self):
+        """恢复后台状态轮询。"""
+        self._polling_enabled = True
 
     # 公开的异步API：将操作加入队列
     async def write_bool(self, key: str, value: bool, *idx: int):
@@ -287,6 +296,8 @@ class ModBusService:
         try:
             while self._running:
                 await asyncio.sleep(self._poll_interval)  # 等待轮询间隔
+                if not self._polling_enabled:
+                    continue
                 # 如果已有轮询任务在队列中，跳过本次（避免堆积）
                 if self._poll_work_pending:
                     continue

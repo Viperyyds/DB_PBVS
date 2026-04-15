@@ -41,6 +41,7 @@ class RobotCore:
         # 机器人状态与参数
         self.robot_parameter = RobotParameters(json_file = self.default_parameter_json)
         self.robot_status = RobotStatus()
+        self._status_timer_enabled = False
         self.timer = Timer(0.05, self.ReadRobotStatus)
         # 确保定时器线程为守护线程，以免阻止进程退出
         self.timer.daemon = True
@@ -75,6 +76,7 @@ class RobotCore:
         if self.connected:
             print("连接成功！启动 ModBusService...")
             self._start_service_loop()
+            self._status_timer_enabled = True
             self.timer.start()
             self._initialize_robot()
         else:
@@ -319,6 +321,9 @@ class RobotCore:
     # 周期性读取机器人状态
     def ReadRobotStatus(self) -> None:
         """周期性读取机器人状态（定时器回调，同步触发异步任务）"""
+        if not self._status_timer_enabled:
+            return
+
         if self.connected and self._loop:
             # 定义异步读取任务
             async def async_read_status():
@@ -333,11 +338,46 @@ class RobotCore:
 
             # 将异步任务提交到事件循环（非阻塞）
             asyncio.run_coroutine_threadsafe(async_read_status(), self._loop)
+
+        if not self._status_timer_enabled:
+            return
+
         # 重置定时器（保持周期性调用）
         self.timer = Timer(0.05, self.ReadRobotStatus)
         # Make timer a daemon so it won't block process exit on KeyboardInterrupt
         self.timer.daemon = True
         self.timer.start()
+
+    def pause_background_status_updates(self) -> None:
+        """暂停后台状态轮询。PBVS 主循环仍可主动读取最新状态。"""
+        self._status_timer_enabled = False
+        if self.timer:
+            self.timer.cancel()
+
+        if self._service and self._loop:
+            try:
+                fut = asyncio.run_coroutine_threadsafe(self._service.pause_polling(), self._loop)
+                fut.result(timeout=2.0)
+            except Exception as e:
+                print(f"暂停后台状态轮询失败：{e}")
+
+    def resume_background_status_updates(self) -> None:
+        """恢复后台状态轮询。"""
+        if not self.connected:
+            return
+
+        if self._service and self._loop:
+            try:
+                fut = asyncio.run_coroutine_threadsafe(self._service.resume_polling(), self._loop)
+                fut.result(timeout=2.0)
+            except Exception as e:
+                print(f"恢复后台状态轮询失败：{e}")
+
+        if not self._status_timer_enabled:
+            self._status_timer_enabled = True
+            self.timer = Timer(0.05, self.ReadRobotStatus)
+            self.timer.daemon = True
+            self.timer.start()
 
     # 获取机器人状态，并转换为JSON
     async def getRobotStatus(self) -> str:
@@ -453,20 +493,24 @@ class RobotCore:
             if not latest_status:
                 raise ValueError("读取到的机器人状态为空")
 
-            # 2. 仅提取关节位置列表 (单位：弧度)
-            # 如果底层对象没有该属性，则提供默认的 6 个 0.0 防止报错
-            joints_rad = getattr(latest_status, 'JointActualPosition', [0.0] * 6)
+            # 2. 仅提取关节位置列表，底层状态中的单位就是弧度
+            joints_rad = getattr(latest_status, 'JointActualPosition', None)
+            if joints_rad is None:
+                raise ValueError("读取到的机器人状态缺少 JointActualPosition")
 
-            # 安全检查：确保拿到的是 6 个元素的列表/元组
+            # 安全检查：确保最终输出固定为 6 个关节
+            joints_rad = list(joints_rad)
             if len(joints_rad) < 6:
-                joints_deg = list(joints_rad) + [0.0] * (6 - len(joints_rad))
+                joints_rad = joints_rad + [0.0] * (6 - len(joints_rad))
             elif len(joints_rad) > 6:
-                joints_deg = joints_rad[:6]
+                joints_rad = joints_rad[:6]
 
-            # 3. 转换为浮点型 numpy 数组
+            # 3. 转换为浮点型 numpy 数组，仍然保持弧度单位
             joints_rad_np = np.array(joints_rad, dtype=float)
+            if not np.all(np.isfinite(joints_rad_np)):
+                raise ValueError(f"关节角包含非法值: {joints_rad_np}")
 
-            # 4. 将获取得到的关节角度由弧度转化为度，用于显示用
+            # 4. 调试变量：弧度转角度，仅用于显示/调试，不作为函数返回
             joints_deg_np = np.rad2deg(joints_rad_np)
 
             return joints_rad_np
@@ -626,10 +670,12 @@ class RobotCore:
             
             # 3. 触发关节运动执行 
             # TODO 核对key，key名不确定
-            await self._service.write_bool('Instructions.TCP_Move_Joint_Execute', True)
-            await asyncio.sleep(0.1)  # 等待触发生效
-            # （可选）复位触发信号（根据设备需求）
-            await self._service.write_bool('Instructions.TCP_Move_Joint_Execute', False)
+            execute_key = 'Instructions.TCP_Move_Joint_Execute'
+            await self._service.write_bool(execute_key, True)
+            try:
+                await asyncio.sleep(0.01)  # 等待触发生效
+            finally:
+                await self._service.write_bool(execute_key, False)
 
             print("MoveJ 指令已发送")
         except Exception as e:
@@ -670,9 +716,12 @@ class RobotCore:
             print(f"[Timing] 6次写入位置耗时: {(t4 - t3)*1000:.2f} ms")
             
             t5 = time.perf_counter()
-            await self._service.write_bool('Instructions.MoveS_Execute', True)
-            await asyncio.sleep(0.01)
-            await self._service.write_bool('Instructions.MoveS_Execute', False)
+            execute_key = 'Instructions.MoveS_Execute'
+            await self._service.write_bool(execute_key, True)
+            try:
+                await asyncio.sleep(0.01)
+            finally:
+                await self._service.write_bool(execute_key, False)
             t6 = time.perf_counter()
             print(f"[Timing] 触发指令+Sleep耗时: {(t6 - t5)*1000:.2f} ms")
 
@@ -688,9 +737,12 @@ class RobotCore:
     async def AbortMoveS(self) -> None:
         """中止当前 MoveS 运动"""
         try:
-            await self._service.write_bool('Instructions.MoveS_Abort', True)
-            await asyncio.sleep(0.1)
-            await self._service.write_bool('Instructions.MoveS_Abort', False)
+            abort_key = 'Instructions.MoveS_Abort'
+            await self._service.write_bool(abort_key, True)
+            try:
+                await asyncio.sleep(0.01)
+            finally:
+                await self._service.write_bool(abort_key, False)
         except Exception as e:
             print(f"AbortMoveS 失败：{e}")
             raise
@@ -992,9 +1044,12 @@ class RobotCore:
             raise RuntimeError("机器人未连接，无法执行停止操作")
         
         try:
-            await self._service.write_bool('Instructions.Stop_Execute', True)
-            await asyncio.sleep(0.1)
-            await self._service.write_bool('Instructions.Stop_Execute', False)
+            stop_key = 'Instructions.Stop_Execute'
+            await self._service.write_bool(stop_key, True)
+            try:
+                await asyncio.sleep(0.1)
+            finally:
+                await self._service.write_bool(stop_key, False)
             print("机器人已停止所有运动")
         except Exception as e:
             print(f"机器人停止失败：{e}")
@@ -1024,6 +1079,7 @@ class RobotCore:
             return
         try:
             # 1. 取消状态读取定时器
+            self._status_timer_enabled = False
             if self.timer:
                 self.timer.cancel()
                 print("已取消状态读取定时器")

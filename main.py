@@ -72,9 +72,12 @@ async def start_servo_task(e_M_o_np, cdMo_np, image_queue, robot_core):
     :param cdMo_np: 靶标在相机坐标系下的期望位姿 (Numpy 4x4)
     """
     print("正在启动视觉伺服核心循环...")
+    exit_reason = "not_started"
+    experiment_logger = None
     try:
+        robot_core.pause_background_status_updates()
         # 调用之前写的 PBVS 核心函数
-        await dbrobot_pbvs_control(
+        exit_reason, experiment_logger = await dbrobot_pbvs_control(
             e_M_o_np=e_M_o_np,
             cdMo_np=cdMo_np,
             image_queue=image_queue,
@@ -90,13 +93,20 @@ async def start_servo_task(e_M_o_np, cdMo_np, image_queue, robot_core):
     finally:
         # 使用 try-except 保护，确保即使机器人连接断开，也能退出异步环境回到 main 清理进程
         try:
-            print("正在尝试停止机器人...")
-            # 这里的获取角度和发送指令建议设置一个简单的超时或直接捕获所有错误
-            q_curr = await asyncio.wait_for(robot_core.getCurrentJointAngles(), timeout=1.0)
-            await asyncio.wait_for(robot_core.MoveJ(q_curr), timeout=1.0)
+            if exit_reason == "converged":
+                print("视觉伺服正常收敛，已发送 MoveS 软保持，不发送全局停止指令。")
+            elif exit_reason == "user_stop":
+                print("视觉伺服已由用户停止，跳过重复全局停止指令。")
+            else:
+                print(f"视觉伺服退出原因: {exit_reason}，正在尝试停止机器人...")
+                await asyncio.wait_for(robot_core.RobotStop(), timeout=2.0)
         except Exception as stop_err:
             print(f"安全停机指令发送失败 (可能机器人连接已断开): {stop_err}")
         print("视觉伺服流程结束")
+
+    if experiment_logger is not None:
+        print("Experiment finished. Drawing recorded PBVS curves.")
+        experiment_logger.plot()
 
 
 if __name__ == '__main__':
@@ -122,8 +132,8 @@ if __name__ == '__main__':
     input(">>> 请手动或通过程序控制机器人运动到 [目标位姿(期望位置)]，完成后按回车确认...")
     print("正在采集期望位姿数据，请保持机器人静止...")
     T_target_cam = get_current_flower_cam_pose(image_data_queue, sequ_len=20)
-    T_target_cam[:3,3] = T_target_cam[:3,3] / 1000.0  # mm → m
     if T_target_cam is not None:
+        T_target_cam[:3,3] = T_target_cam[:3,3] / 1000.0  # mm → m
         print("成功记录期望位姿 (相机坐标系):")
         print(T_target_cam)
     else:
@@ -150,6 +160,10 @@ if __name__ == '__main__':
     finally:
         # 彻底关闭后台进程
         print("清理系统资源...")
+        try:
+            robot_core.stop()
+        except Exception as robot_stop_err:
+            print(f"停止机器人通信服务失败: {robot_stop_err}")
         s_cam_process.terminate()
         s_cam_process.join()
         out_pipe.close()
