@@ -50,9 +50,6 @@ def plot_durations(durations: List[float], avg_duration: float, max_duration: fl
     """绘制耗时散点图，并标注平均值和最大值（支持中文）"""
 
     # ---------- 配置中文字体 ----------
-    # Windows 常用: 'Microsoft YaHei', 'SimHei'
-    # macOS 常用: 'PingFang SC', 'Heiti SC'
-    # Linux 常用: 'WenQuanYi Zen Hei', 'Noto Sans CJK SC'
     plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'PingFang SC', 'WenQuanYi Zen Hei']
     plt.rcParams['axes.unicode_minus'] = False   # 解决负号显示异常
     # ---------------------------------
