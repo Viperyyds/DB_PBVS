@@ -30,6 +30,8 @@ async def test_moves_n_rounds(robot, num_rounds=1000):
         elapsed_ms = (end_time - start_time) * 1000
         durations.append(elapsed_ms)
         print(f"         耗时: {elapsed_ms:.2f} 毫秒")
+        # 时间延迟
+        await asyncio.sleep(0.05)
 
     # 计算统计值
     avg_duration = sum(durations) / len(durations)
@@ -97,9 +99,9 @@ def plot_durations(durations: List[float], avg_duration: float, max_duration: fl
 
 async def main():
     # 请根据实际机器人 IP 修改
-    robot = RobotCore('10.16.208.244')
-    # 运行 500 轮测试
-    await test_moves_n_rounds(robot, num_rounds=500)
+    robot = RobotCore('192.168.1.253')
+    # 运行 50 轮测试
+    await test_moves_n_rounds(robot, num_rounds=50)
 
 
 if __name__ == "__main__":
