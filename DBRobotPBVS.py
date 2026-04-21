@@ -82,7 +82,7 @@ async def dbrobot_pbvs_control(e_M_o_np, cdMo_np, image_queue, duban_robot_con, 
     :return:
     '''
     # 定义PBVS收敛阈值
-    convergence_threshold_t = 0.3  # mm
+    convergence_threshold_t = 1.0  # mm
     convergence_threshold_tu = 0.1  # deg
     # 定义堵板机器人
     duban_mdh_params = [
