@@ -231,7 +231,7 @@ async def dbrobot_pbvs_control(e_M_o_np, cdMo_np, image_queue, duban_robot_con, 
         gain = 5.0
         # 自适应动态增益
         x = np.linalg.norm(error_np, ord=np.inf)
-        lambda_0 = 4.0  # λ(0): 误差为 0 时的增益 (近处的高增益，用于突破最后的误差壁垒)
+        lambda_0 = 2.5  # λ(0): 误差为 0 时的增益 (近处的高增益，用于突破最后的误差壁垒)
         lambda_inf = 0.5  # λ(∞): 误差极大时的增益 (远处的低增益，用于保证初始运动平缓)
         lambda_prime_0 = 30.0  # λ'(0): x=0 处的斜率绝对值 (控制增益从高到底的下降速率，值越大降得越快)
 
