@@ -25,7 +25,7 @@ async def test_moves(robot):
     print(f"MoveS 调用耗时: { (end_time - start_time) * 1000:.2f} 毫秒")
 
     # 等待 0.5 秒后发送第二个目标（应打断第一个运动）
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(0.02)
     print(f"发送目标 B: {pos_B}")
     start_time2 = time.perf_counter()
     await robot.MoveS(pos_B)
@@ -33,7 +33,7 @@ async def test_moves(robot):
     print(f"MoveS 调用耗时: { (end_time2 - start_time2) * 1000:.2f} 毫秒")
 
     # 等待 1 秒后发送第三个目标（再次打断）
-    await asyncio.sleep(1.0)
+    await asyncio.sleep(0.02)
     print(f"发送目标 C: {pos_C}")
     await robot.MoveS(pos_C)
 
@@ -42,7 +42,7 @@ async def test_moves(robot):
 
 
 async def main():
-    robot = RobotCore('10.16.208.244')
+    robot = RobotCore('192.168.1.253')
 
     await test_moves(robot)
 

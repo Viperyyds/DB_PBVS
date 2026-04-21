@@ -128,7 +128,7 @@ async def dbrobot_pbvs_control(e_M_o_np, cdMo_np, image_queue, duban_robot_con, 
     # send_velocities = True
     servo_started = False
 
-    dt_sim = 0.2  # 控制系统运行周期(这里需要与视觉更新位姿的时间相匹配)
+    dt_sim = 0.15  # 控制系统运行周期(这里需要与视觉更新位姿的时间相匹配)
     t_virtual = 0.0  # 运行总时间
     # 视觉伺服主循环
     first_time = True

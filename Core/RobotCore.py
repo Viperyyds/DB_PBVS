@@ -115,7 +115,7 @@ class RobotCore:
                 await self.RobotEnable()
                 await self.RobotReset()
                 await self.SetControlMode(ControlMode.Calibration)
-                # await self.RobotSetParameters(self.robot_parameter)
+                await self.RobotSetParameters(self.robot_parameter)
                 print("初始化成功！")
             except Exception as e:
                 print(f"初始化机器人失败：{e}")
@@ -700,7 +700,7 @@ class RobotCore:
                 await self.SetControlMode(target_mode)
                 self._current_mode = target_mode  # 更新缓存
                 t2 = time.perf_counter()
-                print(f"[Timing] 模式切换实际耗时: {(t2 - t1)*1000:.2f} ms")
+                # print(f"[Timing] 模式切换实际耗时: {(t2 - t1)*1000:.2f} ms")
             else:
                 print(f"[Timing] 模式已是 MoveSoft,跳过 SetControlMode")
             # t1 = time.perf_counter()
@@ -713,7 +713,7 @@ class RobotCore:
                 key = 'Parameters.MoveS_Target_Position'
                 await self._service.write_real(key, joint_positions[i], i+1)
             t4 = time.perf_counter()
-            print(f"[Timing] 6次写入位置耗时: {(t4 - t3)*1000:.2f} ms")
+            # print(f"[Timing] 6次写入位置耗时: {(t4 - t3)*1000:.2f} ms")
             
             t5 = time.perf_counter()
             execute_key = 'Instructions.MoveS_Execute'
@@ -723,11 +723,11 @@ class RobotCore:
             finally:
                 await self._service.write_bool(execute_key, False)
             t6 = time.perf_counter()
-            print(f"[Timing] 触发指令+Sleep耗时: {(t6 - t5)*1000:.2f} ms")
+            # print(f"[Timing] 触发指令+Sleep耗时: {(t6 - t5)*1000:.2f} ms")
 
             end_total = time.perf_counter()
-            print(f"[Timing] MoveS 总耗时: {(end_total - start_total)*1000:.2f} ms")
-            print("-" * 30)
+            # print(f"[Timing] MoveS 总耗时: {(end_total - start_total)*1000:.2f} ms")
+            # print("-" * 30)
             
 
         except Exception as e:
