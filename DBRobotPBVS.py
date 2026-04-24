@@ -3,7 +3,7 @@ from visp.visual_features import FeatureTranslation
 from visp.visual_features import FeatureThetaU
 from visp.vs import Servo
 from visp.core import measureTimeMs
-from get_flower_pose_ema_visp import get_flower_pose_ema_visp
+from get_flower_pose_ema_visp import get_flower_pose_ema_visp, reset_flower_pose_ema
 from visp.core import Matrix
 from robot import RobotMDH
 import numpy as np
@@ -82,7 +82,7 @@ async def dbrobot_pbvs_control(e_M_o_np, cdMo_np, image_queue, duban_robot_con, 
     :return:
     '''
     # 定义PBVS收敛阈值
-    convergence_threshold_t = 1.0  # mm
+    convergence_threshold_t = 0.5  # mm
     convergence_threshold_tu = 0.1  # deg
     # 定义堵板机器人
     duban_mdh_params = [
@@ -121,6 +121,7 @@ async def dbrobot_pbvs_control(e_M_o_np, cdMo_np, image_queue, duban_robot_con, 
 
     # Record all samples during control and draw once after the experiment.
     experiment_logger = PBVSExperimentLogger() if opt_plot else None
+    reset_flower_pose_ema()
 
     final_quit = False
     has_converged = False
@@ -128,8 +129,32 @@ async def dbrobot_pbvs_control(e_M_o_np, cdMo_np, image_queue, duban_robot_con, 
     # send_velocities = True
     servo_started = False
 
-    dt_sim = 0.08  # 控制系统运行周期(这里需要与视觉更新位姿的时间相匹配)
-    t_virtual = 0.0  # 运行总时间
+    dt_sim = 0.08  # 期望控制周期，仅作为积分周期的默认值
+    vision_alpha = 0.6  # PBVS 闭环内不宜过度平滑，否则末端会因滤波滞后产生残余误差
+    idle_sleep = 0.005
+    min_dt_control = 0.04
+    max_dt_control = 0.12
+    command_horizon = 0.10
+    min_joint_step_rad = 2e-4
+    max_vel_far = 0.20
+    max_vel_mid = 0.10
+    max_vel_near = 0.035
+    min_vel_far = 0.018
+    min_vel_mid = 0.010
+    min_vel_near = 0.004
+    max_acc = 1.0
+    strict_converged_samples = 3
+    fine_converged_samples = 8
+    fine_threshold_t = 0.8  # mm，用于噪声区软收敛保护
+    fine_threshold_tu = 0.2  # deg
+    t_virtual = 0.0  # 仅保留兼容旧逻辑，不再用于绘图时间
+    servo_start_time = time.perf_counter()
+    last_command_time = None
+    last_target_lost_hold_time = None
+    prev_q_dot_rad_s = np.zeros(6, dtype=float)
+    prev_error_norm = None
+    strict_converged_count = 0
+    fine_converged_count = 0
     # 视觉伺服主循环
     first_time = True
     while not has_converged:
@@ -145,30 +170,34 @@ async def dbrobot_pbvs_control(e_M_o_np, cdMo_np, image_queue, duban_robot_con, 
         # 记录循环开始的时间
         loop_start = time.perf_counter()
 
-        t_sim_ms = t_virtual * 1000.0
-        # 1. 获取当前机器人关节位置 (单位: rad)
+        t_sim_ms = (loop_start - servo_start_time) * 1000.0
+        # 1. 先取视觉。没有新视觉帧时不更新控制目标，避免用旧误差重复积分。
         t0 = time.perf_counter()
-        q_current_rad = await duban_robot_con.getCurrentJointAngles()
+        cMo_raw, has_new_vision, vision_stamp = get_flower_pose_ema_visp(
+            image_queue, vision_alpha, return_metadata=True
+        )
         t1 = time.perf_counter()
-        # 获取物体在相机坐标系下的位姿
-        cMo_raw = get_flower_pose_ema_visp(image_queue, 0.3)
-        t2 = time.perf_counter()
+
+        if not has_new_vision:
+            await asyncio.sleep(idle_sleep)
+            continue
+
         if cMo_raw is None:
-            print("Target Lost! Holding current position.")
-            # 策略：向机器人发送当前的关节位置，使其原地不动
-            await duban_robot_con.MoveS(q_current_rad.tolist())
+            print("Target Lost! Skip PBVS update and hold once if needed.")
+            now = time.perf_counter()
+            if last_target_lost_hold_time is None or now - last_target_lost_hold_time > 0.5:
+                q_hold_rad = await duban_robot_con.getCurrentJointAngles()
+                await duban_robot_con.MoveS(q_hold_rad.tolist())
+                last_target_lost_hold_time = time.perf_counter()
+            await asyncio.sleep(idle_sleep)
+            continue
 
-            # 目标丢失时同样进行周期补偿，保持控制循环节拍一致
-            elapsed_lost = time.perf_counter() - loop_start
-            sleep_time_lost = dt_sim - elapsed_lost
-            if sleep_time_lost > 0:
-                await asyncio.sleep(sleep_time_lost)
-            else:
-                print(f"Warning: Control loop (target lost) is running behind schedule by {-sleep_time_lost:.3f} seconds!")
-
-            t_virtual += dt_sim
-            continue  # 跳过后续计算，进入下一轮感知
+        # 2. 有新视觉样本时再获取当前机器人关节位置 (单位: rad)
+        t2 = time.perf_counter()
+        q_current_rad = await duban_robot_con.getCurrentJointAngles()
+        t3 = time.perf_counter()
         cMo = cMo_raw
+        last_target_lost_hold_time = None
 
         if first_time:
             # Introduce security wrt tag positioning to avoid PI rotation
@@ -212,9 +241,14 @@ async def dbrobot_pbvs_control(e_M_o_np, cdMo_np, image_queue, duban_robot_con, 
         print(f"平移误差：{error_tr} mm;角度误差{error_tu} deg")
 
         if error_tr < convergence_threshold_t and error_tu < convergence_threshold_tu:
+            strict_converged_count += 1
+        else:
+            strict_converged_count = 0
+
+        if strict_converged_count >= strict_converged_samples:
             has_converged = True
             exit_reason = "converged"
-            print("Servo task has converged; holding current joint position with MoveS")
+            print("Servo task has converged on consecutive fresh vision samples; holding current joint position with MoveS")
             q_hold_rad = await duban_robot_con.getCurrentJointAngles()
             await duban_robot_con.MoveS(q_hold_rad.tolist())
             if opt_plot:
@@ -226,44 +260,112 @@ async def dbrobot_pbvs_control(e_M_o_np, cdMo_np, image_queue, duban_robot_con, 
         lambda_dls = 0.02
         J1_T = J1_np.T
         J1_J1T_damped = np.dot(J1_np, J1_T) + (lambda_dls ** 2) * np.eye(J1_np.shape[0])
-        J_pseudo_dls = np.dot(J1_T, np.linalg.inv(J1_J1T_damped))
-        # 恒定增益
-        gain = 5.0
-        # 自适应动态增益
+        J_pseudo_dls = np.dot(
+            J1_T,
+            np.linalg.solve(J1_J1T_damped, np.eye(J1_J1T_damped.shape[0])),
+        )
+        # 自适应动态增益：保持中误差推进力，但避免过零后因 MoveS 延迟形成振荡。
         x = np.linalg.norm(error_np, ord=np.inf)
-        lambda_0 = 2.5  # λ(0): 误差为 0 时的增益 (近处的高增益，用于突破最后的误差壁垒)
-        lambda_inf = 0.5  # λ(∞): 误差极大时的增益 (远处的低增益，用于保证初始运动平缓)
-        lambda_prime_0 = 30.0  # λ'(0): x=0 处的斜率绝对值
-
-        # 3. 根据官方公式计算动态增益 λ(x)
-        # 公式: λ(x) = (λ_0 - λ_inf) * exp( - (λ'_0 / (λ_0 - λ_inf)) * x ) + λ_inf
-        if abs(lambda_0 - lambda_inf) > 1e-6:  # 防止除以 0
-            exponent = - (lambda_prime_0 / (lambda_0 - lambda_inf)) * x
-            dynamic_gain = (lambda_0 - lambda_inf) * np.exp(exponent) + lambda_inf
-        else:
-            dynamic_gain = lambda_0
+        lambda_min = 0.35
+        lambda_max = 0.95
+        error_scale = 0.015
+        dynamic_gain = lambda_min + (lambda_max - lambda_min) * (1.0 - np.exp(-x / error_scale))
 
         # 将 opt_adaptive_gain 开关作用到实际控制律增益上
         if opt_adaptive_gain:
             selected_gain = dynamic_gain
         else:
-            selected_gain = gain
+            selected_gain = 0.6
+
+        error_norm = float(np.linalg.norm(error_np))
+        error_is_increasing = prev_error_norm is not None and error_norm > prev_error_norm * 1.03
+        if error_is_increasing:
+            selected_gain *= 0.55
 
         q_dot_rad_s = -selected_gain * np.dot(J_pseudo_dls, error_np).flatten()
 
-        max_vel = 0.5
+        now = time.perf_counter()
+        if last_command_time is None:
+            dt_control = dt_sim
+        else:
+            dt_control = min(max(now - last_command_time, min_dt_control), max_dt_control)
+
+        near_target = error_tr < 2.0 and error_tu < 0.3
+        mid_target = error_tr < 8.0 and error_tu < 0.8
+        if near_target:
+            max_vel = max_vel_near
+            min_vel = min_vel_near
+        elif mid_target:
+            max_vel = max_vel_mid
+            min_vel = min_vel_mid
+        else:
+            max_vel = max_vel_far
+            min_vel = min_vel_far
         current_max = np.max(np.abs(q_dot_rad_s))
         if current_max > max_vel:
             # 等比例缩放，保持运动方向不变
             q_dot_rad_s = (q_dot_rad_s / current_max) * max_vel
+            current_max = max_vel
+
+        # MoveS 对极小目标步长不敏感；误差仍明显时给一个很小的速度下限。
+        # 若误差开始增大，则取消下限，只保留阻尼降增益，避免再次振荡。
+        if (
+            not error_is_increasing
+            and current_max > 1e-6
+            and current_max < min_vel
+            and (error_tr > 1.2 or error_tu > 0.18)
+        ):
+            q_dot_rad_s = (q_dot_rad_s / current_max) * min_vel
+
+        max_delta_vel = max_acc * dt_control
+        q_dot_rad_s = np.clip(
+            q_dot_rad_s,
+            prev_q_dot_rad_s - max_delta_vel,
+            prev_q_dot_rad_s + max_delta_vel,
+        )
+
+        fine_ok = error_tr < fine_threshold_t and error_tu < fine_threshold_tu
+        if fine_ok and np.max(np.abs(q_dot_rad_s)) < 0.015:
+            fine_converged_count += 1
+        else:
+            fine_converged_count = 0
+
+        if fine_converged_count >= fine_converged_samples:
+            has_converged = True
+            exit_reason = "converged"
+            print("Servo task has reached the practical visual-noise band; holding current joint position with MoveS")
+            q_hold_rad = await duban_robot_con.getCurrentJointAngles()
+            await duban_robot_con.MoveS(q_hold_rad.tolist())
+            if opt_plot:
+                experiment_logger.append(float(t_sim_ms), error_np, np.zeros(6), q_hold_rad)
+            break
 
         # 向机器人发送关节角度指令
-        q_next_rad = (q_current_rad + q_dot_rad_s * dt_sim).tolist()
-        t3 = time.perf_counter()
-        await duban_robot_con.MoveS(q_next_rad)
-        t4 = time.perf_counter()
+        dt_command = min(max(dt_control, dt_sim), command_horizon)
+        q_step_rad = q_dot_rad_s * dt_command
+        if fine_ok and np.max(np.abs(q_step_rad)) < min_joint_step_rad:
+            prev_q_dot_rad_s = np.zeros(6, dtype=float)
+            prev_error_norm = error_norm
+            if opt_plot:
+                experiment_logger.append(float(t_sim_ms), error_np, np.zeros(6), q_current_rad)
+            await asyncio.sleep(idle_sleep)
+            continue
 
-        print(f"获取角度: {(t1-t0)*1000:.1f} | 视觉: {(t2-t1)*1000:.1f} | 计算: {(t3-t2)*1000:.1f} | MoveS: {(t4-t3)*1000:.1f}")
+        q_next_rad_np = q_current_rad + q_step_rad
+        q_next_rad = q_next_rad_np.tolist()
+        t4 = time.perf_counter()
+        await duban_robot_con.MoveS(q_next_rad)
+        t5 = time.perf_counter()
+        last_command_time = t5
+        prev_q_dot_rad_s = q_dot_rad_s
+        prev_error_norm = error_norm
+
+        print(
+            f"获取角度: {(t3-t2)*1000:.1f} | 视觉: {(t1-t0)*1000:.1f} | "
+            f"计算: {(t4-t3)*1000:.1f} | MoveS: {(t5-t4)*1000:.1f} | "
+            f"dt: {dt_control*1000:.1f} | cmd_dt: {dt_command*1000:.1f} | gain: {selected_gain:.2f} | "
+            f"step: {np.rad2deg(np.max(np.abs(q_step_rad))):.3f} deg"
+        )
         # 记录关节角速度、关节角和特征误差，实验结束后统一绘图
         if opt_plot:
             experiment_logger.append(float(t_sim_ms), error_np, q_dot_rad_s, q_current_rad)
