@@ -68,7 +68,7 @@ async def test_moves(robot):
             start_time = time.perf_counter()
             await robot.MoveS(target)
             elapsed_ms = (time.perf_counter() - start_time) * 1000
-            await asyncio.sleep(0.05)
+            await asyncio.sleep(0.08)
 
             print(
                 f"[轮次 {cycle_idx:04d}] "
