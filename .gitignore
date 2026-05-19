@@ -2,3 +2,6 @@
 __pycache__/
 *.py[cod]
 *$py.class
+# 忽略EyehandCaliData文件夹下的所有内容
+EyehandCaliData/*
+
