@@ -12,12 +12,15 @@ import msvcrt
 import math
 import time
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
 import asyncio
 
 class PBVSExperimentLogger:
     def __init__(self):
         self.time_ms = []
         self.feature_errors = []
+        self.translation_errors_mm = []
+        self.rotation_errors_deg = []
         self.joint_velocities_deg_s = []
         self.joint_angles_deg = []
 
@@ -32,11 +35,67 @@ class PBVSExperimentLogger:
         data = np.asarray(values, dtype=float).reshape(-1)
         return [float(data[i]) for i in range(size)]
 
-    def append(self, time_ms, feature_error, joint_velocity_rad_s, joint_angle_rad):
+    def append(
+        self,
+        time_ms,
+        feature_error,
+        joint_velocity_rad_s,
+        joint_angle_rad,
+        translation_error_mm,
+        rotation_error_deg,
+    ):
         self.time_ms.append(float(time_ms))
         self.feature_errors.append(self._to_float_list(feature_error, 6))
+        self.translation_errors_mm.append(float(translation_error_mm))
+        self.rotation_errors_deg.append(float(rotation_error_deg))
         self.joint_velocities_deg_s.append(self._to_float_list(np.rad2deg(joint_velocity_rad_s), 6))
         self.joint_angles_deg.append(self._to_float_list(np.rad2deg(joint_angle_rad), 6))
+
+    @staticmethod
+    def _plot_error_with_convergence_inset(ax, time_s, error_data, title, ylabel):
+        ax.plot(time_s, error_data, label=ylabel)
+        ax.set_title(title)
+        ax.set_ylabel(ylabel)
+        ax.grid(True)
+
+        tail_count = min(20, len(error_data))
+        if tail_count < 2:
+            ax.legend(loc='upper right', fontsize='small')
+            return
+
+        tail_time = time_s[-tail_count:]
+        tail_error = error_data[-tail_count:]
+        tail_mean = float(np.mean(tail_error))
+
+        ax.axhline(
+            tail_mean,
+            color='tab:red',
+            linestyle='--',
+            linewidth=1.2,
+            label=f"final mean = {tail_mean:.4g}",
+        )
+        ax.text(
+            tail_time[0],
+            tail_mean,
+            f" final mean {tail_mean:.4g}",
+            color='tab:red',
+            va='bottom',
+            fontsize='small',
+        )
+        ax.legend(loc='upper right', fontsize='small')
+
+        axins = inset_axes(ax, width="38%", height="45%", loc='center right', borderpad=1.5)
+        axins.plot(tail_time, tail_error, color='tab:blue')
+        axins.axhline(tail_mean, color='tab:red', linestyle='--', linewidth=1.0)
+        axins.grid(True, alpha=0.35)
+        axins.tick_params(labelsize=8)
+
+        x_margin = max((tail_time[-1] - tail_time[0]) * 0.08, 1e-6)
+        y_span = float(np.max(tail_error) - np.min(tail_error))
+        y_margin = max(y_span * 0.15, max(abs(tail_mean) * 0.05, 1e-6))
+        axins.set_xlim(tail_time[0] - x_margin, tail_time[-1] + x_margin)
+        axins.set_ylim(np.min(tail_error) - y_margin, np.max(tail_error) + y_margin)
+        mark_inset(ax, axins, loc1=2, loc2=4, fc="none", ec="0.45", linestyle='--', linewidth=0.8)
 
     def plot(self):
         if not self.time_ms:
@@ -45,6 +104,8 @@ class PBVSExperimentLogger:
 
         time_s = np.asarray(self.time_ms, dtype=float) / 1000.0
         feature_errors = np.asarray(self.feature_errors, dtype=float)
+        translation_errors_mm = np.asarray(self.translation_errors_mm, dtype=float)
+        rotation_errors_deg = np.asarray(self.rotation_errors_deg, dtype=float)
         joint_velocities_deg_s = np.asarray(self.joint_velocities_deg_s, dtype=float)
         joint_angles_deg = np.asarray(self.joint_angles_deg, dtype=float)
 
@@ -67,6 +128,25 @@ class PBVSExperimentLogger:
 
         axs[-1].set_xlabel("time (s)")
         fig.tight_layout(pad=3.0)
+
+        fig_error, err_axs = plt.subplots(2, 1, figsize=(8, 6), sharex=True)
+        fig_error.canvas.manager.set_window_title("PBVS pose error curves")
+        self._plot_error_with_convergence_inset(
+            err_axs[0],
+            time_s,
+            translation_errors_mm,
+            "Translation error",
+            "mm",
+        )
+        self._plot_error_with_convergence_inset(
+            err_axs[1],
+            time_s,
+            rotation_errors_deg,
+            "Rotation error",
+            "deg",
+        )
+        err_axs[-1].set_xlabel("time (s)")
+        fig_error.tight_layout(pad=3.0)
         plt.show()
 
 
@@ -82,7 +162,7 @@ async def dbrobot_pbvs_control(e_M_o_np, cdMo_np, image_queue, duban_robot_con, 
     :return:
     '''
     # 定义PBVS收敛阈值
-    convergence_threshold_t = 0.5  # mm
+    convergence_threshold_t = 0.1  # mm
     convergence_threshold_tu = 0.1  # deg
     # 定义堵板机器人
     duban_mdh_params = [
@@ -145,7 +225,7 @@ async def dbrobot_pbvs_control(e_M_o_np, cdMo_np, image_queue, duban_robot_con, 
     max_acc = 1.0
     strict_converged_samples = 3
     fine_converged_samples = 8
-    fine_threshold_t = 0.8  # mm，用于噪声区软收敛保护
+    fine_threshold_t = 0.5  # mm，用于噪声区软收敛保护
     fine_threshold_tu = 0.2  # deg
     t_virtual = 0.0  # 仅保留兼容旧逻辑，不再用于绘图时间
     servo_start_time = time.perf_counter()
@@ -252,7 +332,7 @@ async def dbrobot_pbvs_control(e_M_o_np, cdMo_np, image_queue, duban_robot_con, 
             q_hold_rad = await duban_robot_con.getCurrentJointAngles()
             await duban_robot_con.MoveS(q_hold_rad.tolist())
             if opt_plot:
-                experiment_logger.append(float(t_sim_ms), error_np, np.zeros(6), q_hold_rad)
+                experiment_logger.append(float(t_sim_ms), error_np, np.zeros(6), q_hold_rad, error_tr, error_tu)
             break
 
         # 5. DLS 核心算法
@@ -337,7 +417,7 @@ async def dbrobot_pbvs_control(e_M_o_np, cdMo_np, image_queue, duban_robot_con, 
             q_hold_rad = await duban_robot_con.getCurrentJointAngles()
             await duban_robot_con.MoveS(q_hold_rad.tolist())
             if opt_plot:
-                experiment_logger.append(float(t_sim_ms), error_np, np.zeros(6), q_hold_rad)
+                experiment_logger.append(float(t_sim_ms), error_np, np.zeros(6), q_hold_rad, error_tr, error_tu)
             break
 
         # 向机器人发送关节角度指令
@@ -347,7 +427,7 @@ async def dbrobot_pbvs_control(e_M_o_np, cdMo_np, image_queue, duban_robot_con, 
             prev_q_dot_rad_s = np.zeros(6, dtype=float)
             prev_error_norm = error_norm
             if opt_plot:
-                experiment_logger.append(float(t_sim_ms), error_np, np.zeros(6), q_current_rad)
+                experiment_logger.append(float(t_sim_ms), error_np, np.zeros(6), q_current_rad, error_tr, error_tu)
             await asyncio.sleep(idle_sleep)
             continue
 
@@ -368,7 +448,7 @@ async def dbrobot_pbvs_control(e_M_o_np, cdMo_np, image_queue, duban_robot_con, 
         )
         # 记录关节角速度、关节角和特征误差，实验结束后统一绘图
         if opt_plot:
-            experiment_logger.append(float(t_sim_ms), error_np, q_dot_rad_s, q_current_rad)
+            experiment_logger.append(float(t_sim_ms), error_np, q_dot_rad_s, q_current_rad, error_tr, error_tu)
         if first_time:
             first_time = False
         t_virtual += dt_sim  # 控制时间步进
