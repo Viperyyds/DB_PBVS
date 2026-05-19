@@ -58,7 +58,7 @@ class PBVSExperimentLogger:
         ax.set_ylabel(ylabel)
         ax.grid(True)
 
-        tail_count = min(20, len(error_data))
+        tail_count = min(8, len(error_data))
         if tail_count < 2:
             ax.legend(loc='upper right', fontsize='small')
             return
@@ -72,12 +72,12 @@ class PBVSExperimentLogger:
             color='tab:red',
             linestyle='--',
             linewidth=1.2,
-            label=f"final mean = {tail_mean:.4g}",
+            label=f"final 8-frame mean = {tail_mean:.4g}",
         )
         ax.text(
             tail_time[0],
             tail_mean,
-            f" final mean {tail_mean:.4g}",
+            f" final 8-frame mean {tail_mean:.4g}",
             color='tab:red',
             va='bottom',
             fontsize='small',
@@ -95,7 +95,7 @@ class PBVSExperimentLogger:
         y_margin = max(y_span * 0.15, max(abs(tail_mean) * 0.05, 1e-6))
         axins.set_xlim(tail_time[0] - x_margin, tail_time[-1] + x_margin)
         axins.set_ylim(np.min(tail_error) - y_margin, np.max(tail_error) + y_margin)
-        mark_inset(ax, axins, loc1=2, loc2=4, fc="none", ec="0.45", linestyle='--', linewidth=0.8)
+        mark_inset(ax, axins, loc1=3, loc2=4, fc="none", ec="0.45", linestyle='--', linewidth=0.8)
 
     def plot(self):
         if not self.time_ms:
