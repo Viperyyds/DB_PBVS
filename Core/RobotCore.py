@@ -113,7 +113,7 @@ class RobotCore:
         async def init_tasks():
             try:
                 await self.RobotEnable()
-                await self.RobotReset()
+                # await self.RobotReset()
                 await self.SetControlMode(ControlMode.Calibration)
                 await self.RobotSetParameters(self.robot_parameter)
                 print("初始化成功！")
