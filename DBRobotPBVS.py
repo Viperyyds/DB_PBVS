@@ -169,7 +169,7 @@ async def dbrobot_pbvs_control(e_M_o_np, cdMo_np, image_queue, duban_robot_con, 
         [0, 0, 0.3085, 0],
         [-np.pi / 2, 0, 0, -np.pi / 2],
         [0, 0.3, 0, np.pi / 2],
-        [np.pi / 2, 0, 0.6865, 0],
+        [np.pi / 2, 0, 0.6965, 0],
         [-np.pi / 2, 0, 0, 0],
         [np.pi / 2, 0, 0.2649, 0],
     ]
